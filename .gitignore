@@ -1,0 +1,20 @@
+# Build artifacts
+/build/
+/CMakeFiles/
+/CMakeCache.txt
+/*.cmake
+/*.obj
+/*.exe
+/*.pdb
+/*.ilk
+/*.log
+
+# Visual Studio files
+*.sln
+*.vcxproj*
+*.user
+*.opensdf
+*.ipch
+
+# Misc
+/.vs/
