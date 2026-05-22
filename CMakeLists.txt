@@ -13,7 +13,10 @@ add_executable(SsalMuk
     src/screen_analyzer.cpp
 )
 
+find_package(CURL REQUIRED)
+
 target_include_directories(SsalMuk PRIVATE src)
+target_link_libraries(SsalMuk PRIVATE CURL::libcurl)
 
 if(WIN32)
     target_compile_definitions(SsalMuk PRIVATE PLATFORM_WINDOWS)

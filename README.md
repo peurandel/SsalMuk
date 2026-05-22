@@ -30,3 +30,14 @@ Windows 환경에서 `scrcpy`로 연결된 Android 기기를 C++ 기반 LLM 자�
 - Ollama 외 다른 LLM 제공자 확장
 - OCR/컴퓨터 비전 통합
 - 앱 탐색/조작 시나리오 구체화
+
+## 실행
+
+- **형태**: 이 프로그램은 대화형 CLI입니다. `main.cpp`가 런타임에 사용자 입력을 프롬프트로 받아 처리합니다.
+- **Linux 사용 예**: 스크립트 `run.sh`를 통해 빌드 후 실행합니다.
+	- 실행 전 권한 부여: `chmod +x run.sh`
+	- 빌드 및 실행: `./run.sh`
+- **Windows 사용 예**: `run.bat`을 이용해 빌드 후 실행합니다.
+	- 빌드 및 실행: `run.bat`
+
+환경 변수로 `OLLAMA_API_URL`, `OLLAMA_MODEL`, `OLLAMA_API_KEY`를 미리 설정하면 런타임 프롬프트를 건너뛸 수 있습니다.

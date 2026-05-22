@@ -5,9 +5,16 @@
 #include <string>
 #include <vector>
 
+struct LlmStep {
+    std::string action;
+    std::optional<int> x;
+    std::optional<int> y;
+    std::string text;
+};
+
 struct LlmPlan {
     std::string description;
-    std::vector<std::string> steps;
+    std::vector<LlmStep> steps;
 };
 
 class LlmAgent {

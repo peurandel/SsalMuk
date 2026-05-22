@@ -1,8 +1,21 @@
 #include "ollama_provider.h"
+#include <curl/curl.h>
 #include <cstdlib>
-#include <fstream>
 #include <iostream>
 #include <sstream>
+#include <string>
+
+static std::string getEnvValue(const char* name) {
+    const char* value = std::getenv(name);
+    return value ? std::string(value) : std::string();
+}
+
+static size_t writeCallback(void* contents, size_t size, size_t nmemb, void* userp) {
+    size_t totalSize = size * nmemb;
+    std::string* response = static_cast<std::string*>(userp);
+    response->append(static_cast<char*>(contents), totalSize);
+    return totalSize;
+}
 
 static std::string escapeJsonString(const std::string& input) {
     std::ostringstream escaped;
@@ -26,105 +39,65 @@ static std::string escapeJsonString(const std::string& input) {
     return escaped.str();
 }
 
-static std::string getEnvValue(const char* name) {
-    const char* value = std::getenv(name);
-    return value ? std::string(value) : std::string();
-}
-
-static std::optional<std::string> extractJsonStringValue(const std::string& text, const std::string& key) {
-    std::string needle = "\"" + key + "\"";
-    auto pos = text.find(needle);
-    if (pos == std::string::npos) {
-        return std::nullopt;
-    }
-    pos = text.find(':', pos);
-    if (pos == std::string::npos) {
-        return std::nullopt;
-    }
-    pos = text.find('"', pos);
-    if (pos == std::string::npos) {
-        return std::nullopt;
-    }
-    std::string extracted;
-    bool escaping = false;
-    for (size_t i = pos + 1; i < text.size(); ++i) {
-        char c = text[i];
-        if (escaping) {
-            switch (c) {
-            case '"': extracted.push_back('"'); break;
-            case '\\': extracted.push_back('\\'); break;
-            case 'n': extracted.push_back('\n'); break;
-            case 'r': extracted.push_back('\r'); break;
-            case 't': extracted.push_back('\t'); break;
-            default: extracted.push_back(c); break;
-            }
-            escaping = false;
-        } else if (c == '\\') {
-            escaping = true;
-        } else if (c == '"') {
-            break;
-        } else {
-            extracted.push_back(c);
-        }
-    }
-    return extracted;
-}
-
 OllamaProvider::OllamaProvider(std::string apiUrl, std::string model)
     : apiUrl_(std::move(apiUrl)), model_(std::move(model)) {
 }
 
 std::optional<std::string> OllamaProvider::requestCompletion(const std::string& prompt) {
-    const std::string bodyPath = "ssalmuk_ollama_request.json";
-    const std::string responsePath = "ssalmuk_ollama_response.json";
-
-    std::ofstream bodyFile(bodyPath);
-    if (!bodyFile.is_open()) {
-        std::cerr << "LLM 요청 본문 파일을 생성할 수 없습니다: " << bodyPath << std::endl;
+    CURL* curl = curl_easy_init();
+    if (!curl) {
+        std::cerr << "libcurl 초기화에 실패했습니다." << std::endl;
         return std::nullopt;
     }
 
-    std::string escapedPrompt = escapeJsonString(prompt);
-    bodyFile << "{\"model\":\"" << model_ << "\","
-             << "\"messages\":[{\"role\":\"system\",\"content\":\"You are an Android automation assistant. Respond with a sequence of actions using tap, type, and capture steps.\"},"
-             << "{\"role\":\"user\",\"content\":\"" << escapedPrompt << "\"}],"
-             << "\"temperature\":0.2,\"max_tokens\":512}";
-    bodyFile.close();
+    std::string responseText;
+    std::string requestBody;
+    requestBody.reserve(prompt.size() + 256);
+    requestBody += "{\"model\":\"";
+    requestBody += model_;
+    requestBody += "\",";
+    requestBody += "\"messages\":[{\"role\":\"system\",\"content\":\"You are an Android automation assistant. Respond with a short natural language reasoning, then output a valid JSON object with keys description and steps. Each step must be an object with action and optional x, y, or text fields.\"},{\"role\":\"user\",\"content\":\"";
+    requestBody += escapeJsonString(prompt);
+    requestBody += "\"}],\"temperature\":0.2,\"max_tokens\":512}";
 
+    struct curl_slist* headers = nullptr;
+    headers = curl_slist_append(headers, "Content-Type: application/json");
     std::string apiKey = getEnvValue("OLLAMA_API_KEY");
-    std::string authHeader;
     if (!apiKey.empty()) {
-        authHeader = " -H \"Authorization: Bearer " + apiKey + "\"";
+        std::string authHeader = "Authorization: Bearer " + apiKey;
+        headers = curl_slist_append(headers, authHeader.c_str());
     }
 
-    std::string command = "curl -s -X POST -H \"Content-Type: application/json\"" + authHeader + " -d @" + bodyPath + " \"" + apiUrl_ + "\" > " + responsePath;
-    int result = std::system(command.c_str());
-    if (result != 0) {
-        std::cerr << "Ollama API 호출에 실패했습니다. 명령: " << command << std::endl;
+    curl_easy_setopt(curl, CURLOPT_URL, apiUrl_.c_str());
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_POST, 1L);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, requestBody.c_str());
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, static_cast<long>(requestBody.size()));
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseText);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "SsalMuk/1.0");
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
+
+    CURLcode res = curl_easy_perform(curl);
+    long responseCode = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &responseCode);
+    curl_slist_free_all(headers);
+    curl_easy_cleanup(curl);
+
+    if (res != CURLE_OK) {
+        std::cerr << "Ollama API 호출에 실패했습니다: " << curl_easy_strerror(res) << std::endl;
         return std::nullopt;
     }
-
-    std::ifstream responseFile(responsePath);
-    if (!responseFile.is_open()) {
-        std::cerr << "LLM 응답 파일을 읽을 수 없습니다: " << responsePath << std::endl;
+    if (responseCode < 200 || responseCode >= 300) {
+        std::cerr << "Ollama API 응답 코드가 비정상적입니다: " << responseCode << std::endl;
         return std::nullopt;
     }
-
-    std::ostringstream responseBuffer;
-    responseBuffer << responseFile.rdbuf();
-    std::string responseText = responseBuffer.str();
-    responseFile.close();
 
     if (responseText.empty()) {
         std::cerr << "Ollama 응답이 비어 있습니다." << std::endl;
         return std::nullopt;
     }
 
-    if (auto content = extractJsonStringValue(responseText, "content"); content && !content->empty()) {
-        return content;
-    }
-    if (auto text = extractJsonStringValue(responseText, "text"); text && !text->empty()) {
-        return text;
-    }
     return responseText;
 }

@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include "llm_agent.h"
 #include "scrcpy_controller.h"
@@ -24,6 +25,18 @@ static std::string getEnvOrPrompt(const char* envName, const char* prompt, const
     return value;
 }
 
+static bool getEnvBool(const char* envName) {
+    const char* envValue = std::getenv(envName);
+    if (!envValue) {
+        return false;
+    }
+    std::string value(envValue);
+    for (auto& c : value) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    return value == "1" || value == "true" || value == "yes" || value == "on";
+}
+
 int main() {
     std::cout << "SsalMuk: 시각장애인용 Android 자동화 도우미" << std::endl;
     std::cout << "Windows + scrcpy + Ollama 기반 API 테스트 프로토타입입니다.\n";
@@ -43,6 +56,11 @@ int main() {
 
     LlmAgent llm(apiUrl, model);
     ScreenAnalyzer analyzer;
+    bool dryRun = getEnvBool("SSALMUK_DRY_RUN");
+
+    if (dryRun) {
+        std::cout << "[DRY-RUN] 명령을 실제로 실행하지 않습니다. 환경 변수 SSALMUK_DRY_RUN=1을 사용 중입니다." << std::endl;
+    }
 
     while (true) {
         std::cout << "\n명령 입력 (종료하려면 quit 입력): ";
@@ -63,18 +81,34 @@ int main() {
 
         std::cout << "LLM 계획: " << plan->description << std::endl;
         for (const auto& step : plan->steps) {
-            std::cout << "실행: " << step << std::endl;
-            if (step.rfind("tap", 0) == 0) {
-                int x, y;
-                if (sscanf(step.c_str(), "tap %d %d", &x, &y) == 2) {
-                    controller.tap(x, y);
+            std::cout << "실행: " << step.action;
+            if (step.action == "tap") {
+                std::cout << " " << step.x.value_or(-1) << " " << step.y.value_or(-1);
+            } else if (step.action == "type") {
+                std::cout << " " << step.text;
+            }
+            std::cout << std::endl;
+
+            if (dryRun) {
+                continue;
+            }
+
+            if (step.action == "tap") {
+                if (step.x && step.y) {
+                    controller.tap(*step.x, *step.y);
+                } else {
+                    std::cerr << "잘못된 tap 명령: x,y 좌표가 필요합니다." << std::endl;
                 }
-            } else if (step.rfind("type", 0) == 0) {
-                std::string text = step.substr(5);
-                controller.typeText(text);
-            } else if (step == "capture") {
-                controller.captureScreen();
-                analyzer.analyzeScreen();
+            } else if (step.action == "type") {
+                controller.typeText(step.text);
+            } else if (step.action == "capture") {
+                if (auto filePath = controller.captureScreen()) {
+                    analyzer.analyzeScreen(*filePath);
+                } else {
+                    std::cerr << "화면 캡처에 실패했습니다." << std::endl;
+                }
+            } else {
+                std::cerr << "알 수 없는 명령: " << step.action << std::endl;
             }
         }
 

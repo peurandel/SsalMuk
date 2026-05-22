@@ -1,9 +1,11 @@
 #pragma once
 
+#include <string>
+
 class ScreenAnalyzer {
 public:
     ScreenAnalyzer();
     ~ScreenAnalyzer();
 
-    void analyzeScreen();
+    void analyzeScreen(const std::string& screenPath);
 };
