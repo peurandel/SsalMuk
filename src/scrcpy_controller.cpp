@@ -1,6 +1,7 @@
 #include "scrcpy_controller.h"
 #include <cstdlib>
 #include <iostream>
+#include <cstring>
 
 #ifndef _WIN32
 #include <sys/types.h>
@@ -39,6 +40,23 @@ static std::string shellEscapeArg(const std::string& value) {
     escaped += "'";
     return escaped;
 #endif
+}
+
+static bool commandExists(const std::string& command) {
+#ifdef _WIN32
+    std::string check = "where " + command + " >nul 2>&1";
+#else
+    std::string check = "command -v " + command + " >/dev/null 2>&1";
+#endif
+    return std::system(check.c_str()) == 0;
+}
+
+void ScrcpyController::setLastError(const std::string& message) {
+    lastError_ = message;
+}
+
+std::string ScrcpyController::lastError() const {
+    return lastError_;
 }
 
 ScrcpyController::ScrcpyController() {}
@@ -116,14 +134,24 @@ static bool runProcessCaptureToFile(const std::vector<std::string>& args, const 
 #endif
 
 bool ScrcpyController::launch() {
+    setLastError("");
     std::cout << "scrcpy 실행 중..." << std::endl;
+    if (!commandExists("scrcpy")) {
+        setLastError("scrcpy 명령어를 찾을 수 없습니다. scrcpy가 설치되어 있고 PATH에 포함되어 있는지 확인하세요.");
+        return false;
+    }
 #ifdef _WIN32
     int result = std::system("start /B scrcpy");
-    return result == 0;
+    if (result != 0) {
+        setLastError("scrcpy 실행 명령을 시작하지 못했습니다.");
+        return false;
+    }
+    return true;
 #else
 #ifdef __linux__
     pid_t pid = fork();
     if (pid == -1) {
+        setLastError(std::string("fork 실패: ") + std::strerror(errno));
         return false;
     }
     if (pid == 0) {
@@ -134,24 +162,48 @@ bool ScrcpyController::launch() {
     return true;
 #else
     int result = std::system("scrcpy >/dev/null 2>&1 &");
-    return result == 0;
+    if (result != 0) {
+        setLastError("scrcpy를 백그라운드로 실행하지 못했습니다.");
+        return false;
+    }
+    return true;
 #endif
 #endif
 }
 
 bool ScrcpyController::tap(int x, int y) {
+    setLastError("");
     std::cout << "탭 이벤트: (" << x << ", " << y << ")" << std::endl;
+    if (!commandExists("adb")) {
+        setLastError("adb 명령어를 찾을 수 없습니다. Android 디바이스 USB 디버깅이 활성화되어 있고 adb가 설치되어 있는지 확인하세요.");
+        return false;
+    }
 #ifndef _WIN32
     std::vector<std::string> args = {"adb", "shell", "input", "tap", std::to_string(x), std::to_string(y)};
-    return runProcess(args) == 0;
+    int result = runProcess(args);
+    if (result != 0) {
+        setLastError("adb tap 명령 실행에 실패했습니다. exit code=" + std::to_string(result));
+        return false;
+    }
+    return true;
 #else
     std::string command = "adb shell input tap " + std::to_string(x) + " " + std::to_string(y);
-    return std::system(command.c_str()) == 0;
+    int result = std::system(command.c_str());
+    if (result != 0) {
+        setLastError("adb tap 실행에 실패했습니다. exit code=" + std::to_string(result));
+        return false;
+    }
+    return true;
 #endif
 }
 
 bool ScrcpyController::typeText(const std::string& text) {
+    setLastError("");
     std::cout << "텍스트 입력: " << text << std::endl;
+    if (!commandExists("adb")) {
+        setLastError("adb 명령어를 찾을 수 없습니다. Android 디바이스 USB 디버깅이 활성화되어 있고 adb가 설치되어 있는지 확인하세요.");
+        return false;
+    }
     std::string escaped;
     for (char c : text) {
         switch (c) {
@@ -166,27 +218,45 @@ bool ScrcpyController::typeText(const std::string& text) {
     }
 #ifndef _WIN32
     std::vector<std::string> args = {"adb", "shell", "input", "text", escaped};
-    return runProcess(args) == 0;
+    int result = runProcess(args);
+    if (result != 0) {
+        setLastError("adb text 입력 명령 실행에 실패했습니다. exit code=" + std::to_string(result));
+        return false;
+    }
+    return true;
 #else
     std::string command = "adb shell input text " + shellEscapeArg(escaped);
-    return std::system(command.c_str()) == 0;
+    int result = std::system(command.c_str());
+    if (result != 0) {
+        setLastError("adb text 실행에 실패했습니다. exit code=" + std::to_string(result));
+        return false;
+    }
+    return true;
 #endif
 }
 
 std::optional<std::string> ScrcpyController::captureScreen() {
+    setLastError("");
     std::cout << "화면 캡처를 시도합니다..." << std::endl;
     const std::string path = "screen.png";
+    if (!commandExists("adb")) {
+        setLastError("adb 명령어를 찾을 수 없습니다. Android 디바이스 USB 디버깅이 활성화되어 있고 adb가 설치되어 있는지 확인하세요.");
+        return std::nullopt;
+    }
 #ifndef _WIN32
     std::vector<std::string> args = {"adb", "exec-out", "screencap", "-p"};
     if (runProcessCaptureToFile(args, path)) {
         return path;
     }
+    setLastError("adb 화면 캡처 명령 실행에 실패했습니다.");
     return std::nullopt;
 #else
     std::string command = "adb exec-out screencap -p > " + shellEscapeArg(path);
-    if (std::system(command.c_str()) == 0) {
+    int result = std::system(command.c_str());
+    if (result == 0) {
         return path;
     }
+    setLastError("adb 화면 캡처 실행에 실패했습니다. exit code=" + std::to_string(result));
     return std::nullopt;
 #endif
 }

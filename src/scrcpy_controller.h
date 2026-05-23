@@ -12,4 +12,9 @@ public:
     bool tap(int x, int y);
     bool typeText(const std::string& text);
     std::optional<std::string> captureScreen();
+    std::string lastError() const;
+
+private:
+    void setLastError(const std::string& message);
+    std::string lastError_;
 };

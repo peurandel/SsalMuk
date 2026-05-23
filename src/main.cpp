@@ -50,7 +50,7 @@ int main() {
 
     ScrcpyController controller;
     if (!controller.launch()) {
-        std::cerr << "scrcpy 실행에 실패했습니다. scrcpy가 설치되었는지 확인하세요." << std::endl;
+        std::cerr << "scrcpy 실행에 실패했습니다. 사유: " << controller.lastError() << std::endl;
         return 1;
     }
 
@@ -105,7 +105,7 @@ int main() {
                 if (auto filePath = controller.captureScreen()) {
                     analyzer.analyzeScreen(*filePath);
                 } else {
-                    std::cerr << "화면 캡처에 실패했습니다." << std::endl;
+                    std::cerr << "화면 캡처에 실패했습니다. 사유: " << controller.lastError() << std::endl;
                 }
             } else {
                 std::cerr << "알 수 없는 명령: " << step.action << std::endl;
