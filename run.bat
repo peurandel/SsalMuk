@@ -3,6 +3,12 @@ REM Build directory 생성 및 빌드
 if not exist build (
     mkdir build
 )
+where cmake >nul 2>&1
+if errorlevel 1 (
+    echo CMake를 찾을 수 없습니다. 먼저 setup_windows.bat를 실행하여 필요한 도구를 준비하세요.
+    pause
+    exit /b 1
+)
 pushd build
 cmake ..
 if errorlevel 1 (

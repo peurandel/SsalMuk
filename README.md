@@ -34,6 +34,14 @@ Windows 환경에서 `scrcpy`로 연결된 Android 기기를 C++ 기반 LLM 자�
 - Linux: `./build/SsalMukInstaller --source build --dest /opt/SsalMuk`
 - Windows: `build\SsalMukInstaller.exe --source build --dest "C:\Program Files\SsalMuk"`
 
+## Windows 설치 준비 도구
+Windows 환경에서 필요한 도구를 빠르게 점검하려면 `setup_windows.bat`을 실행하세요.
+- `cmake`, `adb`, `scrcpy`, `Inno Setup iscc` 설치 상태를 확인합니다.
+- `adb`와 `scrcpy`가 없으면 `deps` 폴더에 다운로드 파일을 준비합니다.
+- `cmake`가 없으면 CMake 설치 프로그램을 다운로드합니다.
+
+> 실행 방법: `setup_windows.bat`
+
 ## Windows 단일 EXE 설치기
 Windows에서 한 번 클릭으로 설치하려면 Inno Setup을 사용해 설치 파일을 만듭니다.
 - 빌드 후: `build_installer.bat`
