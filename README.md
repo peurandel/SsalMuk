@@ -26,6 +26,14 @@ Windows 환경에서 `scrcpy`로 연결된 Android 기기를 C++ 기반 LLM 자�
 3. `cmake ..`
 4. `cmake --build .`
 
+- Vulkan UI를 사용하려면 `libglfw3-dev`와 `libvulkan-dev`가 설치되어 있어야 합니다.
+- `SsalMukUI` 바이너리는 Vulkan 기반 창과 기본 렌더링 루프를 제공합니다.
+- `SsalMukInstaller` 바이너리를 빌드하면 설치 프로그램을 실행하여 빌드 결과물을 지정한 디렉터리에 복사할 수 있습니다.
+
+## 설치 프로그램 사용 예
+- Linux: `./build/SsalMukInstaller --source build --dest /opt/SsalMuk`
+- Windows: `build\SsalMukInstaller.exe --source build --dest "C:\Program Files\SsalMuk"`
+
 ## 다음 단계
 - Ollama 외 다른 LLM 제공자 확장
 - OCR/컴퓨터 비전 통합
