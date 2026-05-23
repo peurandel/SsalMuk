@@ -34,6 +34,14 @@ Windows 환경에서 `scrcpy`로 연결된 Android 기기를 C++ 기반 LLM 자�
 - Linux: `./build/SsalMukInstaller --source build --dest /opt/SsalMuk`
 - Windows: `build\SsalMukInstaller.exe --source build --dest "C:\Program Files\SsalMuk"`
 
+## Windows 단일 EXE 설치기
+Windows에서 한 번 클릭으로 설치하려면 Inno Setup을 사용해 설치 파일을 만듭니다.
+- 빌드 후: `build_installer.bat`
+- 또는 직접: `iscc windows\SsalMukInstaller.iss`
+- 생성된 설치 파일: `output\SsalMuk-Installer.exe`
+
+> 이 스크립트는 `SsalMuk.exe`, `SsalMukUI.exe`, `SsalMukInstaller.exe`, `README.md`를 설치 폴더로 복사합니다.
+
 ## 다음 단계
 - Ollama 외 다른 LLM 제공자 확장
 - OCR/컴퓨터 비전 통합
