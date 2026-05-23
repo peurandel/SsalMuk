@@ -1,0 +1,1 @@
+{"description":"Open app and press button","steps":[{"action":"tap","x":100,"y":200},{"action":"type","text":"Hello"},{"action":"capture"}]}

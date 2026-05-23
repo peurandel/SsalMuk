@@ -1,6 +1,8 @@
 #include "scrcpy_controller.h"
 #include <cstdlib>
 #include <iostream>
+
+#ifndef _WIN32
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -9,6 +11,7 @@
 #include <vector>
 #include <errno.h>
 #include <string.h>
+#endif
 
 static std::string shellEscapeArg(const std::string& value) {
 #ifdef _WIN32
@@ -33,7 +36,7 @@ static std::string shellEscapeArg(const std::string& value) {
             escaped.push_back(c);
         }
     }
-    escaped.push_back('\'');
+    escaped += "'";
     return escaped;
 #endif
 }
@@ -42,6 +45,7 @@ ScrcpyController::ScrcpyController() {}
 
 ScrcpyController::~ScrcpyController() {}
 
+#ifndef _WIN32
 static int runProcess(const std::vector<std::string>& args) {
     if (args.empty()) return -1;
     std::vector<char*> argv;
@@ -109,13 +113,15 @@ static bool runProcessCaptureToFile(const std::vector<std::string>& args, const 
     if (waitpid(pid, &status, 0) == -1) return false;
     return (WIFEXITED(status) && WEXITSTATUS(status) == 0);
 }
+#endif
 
 bool ScrcpyController::launch() {
     std::cout << "scrcpy 실행 중..." << std::endl;
 #ifdef _WIN32
     int result = std::system("start /B scrcpy");
+    return result == 0;
 #else
-#    ifdef __linux__
+#ifdef __linux__
     pid_t pid = fork();
     if (pid == -1) {
         return false;
@@ -130,12 +136,18 @@ bool ScrcpyController::launch() {
     int result = std::system("scrcpy >/dev/null 2>&1 &");
     return result == 0;
 #endif
+#endif
 }
 
 bool ScrcpyController::tap(int x, int y) {
     std::cout << "탭 이벤트: (" << x << ", " << y << ")" << std::endl;
+#ifndef _WIN32
     std::vector<std::string> args = {"adb", "shell", "input", "tap", std::to_string(x), std::to_string(y)};
     return runProcess(args) == 0;
+#else
+    std::string command = "adb shell input tap " + std::to_string(x) + " " + std::to_string(y);
+    return std::system(command.c_str()) == 0;
+#endif
 }
 
 bool ScrcpyController::typeText(const std::string& text) {
@@ -152,16 +164,29 @@ bool ScrcpyController::typeText(const std::string& text) {
             default: escaped.push_back(c); break;
         }
     }
+#ifndef _WIN32
     std::vector<std::string> args = {"adb", "shell", "input", "text", escaped};
     return runProcess(args) == 0;
+#else
+    std::string command = "adb shell input text " + shellEscapeArg(escaped);
+    return std::system(command.c_str()) == 0;
+#endif
 }
 
 std::optional<std::string> ScrcpyController::captureScreen() {
     std::cout << "화면 캡처를 시도합니다..." << std::endl;
     const std::string path = "screen.png";
+#ifndef _WIN32
     std::vector<std::string> args = {"adb", "exec-out", "screencap", "-p"};
     if (runProcessCaptureToFile(args, path)) {
         return path;
     }
     return std::nullopt;
+#else
+    std::string command = "adb exec-out screencap -p > " + shellEscapeArg(path);
+    if (std::system(command.c_str()) == 0) {
+        return path;
+    }
+    return std::nullopt;
+#endif
 }

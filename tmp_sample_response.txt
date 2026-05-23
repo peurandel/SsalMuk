@@ -1,0 +1,5 @@
+Here is what I will do:
+1) Open the app
+2) Tap the button
+
+{"description":"Open app and press button","steps":[{"action":"tap","x":100,"y":200},{"action":"type","text":"Hello"},{"action":"capture"}]}

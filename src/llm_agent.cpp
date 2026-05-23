@@ -27,6 +27,10 @@ std::optional<LlmPlan> LlmAgent::analyzeUserRequest(const std::string& request) 
     return parseProviderResponse(*response);
 }
 
+std::optional<LlmPlan> LlmAgent::parseResponseToPlan(const std::string& response) {
+    return parseProviderResponse(response);
+}
+
 std::string LlmAgent::buildPrompt(const std::string& request) {
     std::ostringstream prompt;
     prompt << "당신은 Android 화면 자동화를 위한 보조 도우미입니다. ";

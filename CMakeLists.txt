@@ -13,10 +13,18 @@ add_executable(SsalMuk
     src/screen_analyzer.cpp
 )
 
+add_executable(llm_parse_test
+    src/llm_parse_test.cpp
+    src/llm_agent.cpp
+    src/ollama_provider.cpp
+)
+
 find_package(CURL REQUIRED)
 
 target_include_directories(SsalMuk PRIVATE src)
+target_include_directories(llm_parse_test PRIVATE src)
 target_link_libraries(SsalMuk PRIVATE CURL::libcurl)
+target_link_libraries(llm_parse_test PRIVATE CURL::libcurl)
 
 if(WIN32)
     target_compile_definitions(SsalMuk PRIVATE PLATFORM_WINDOWS)

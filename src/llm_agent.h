@@ -23,6 +23,8 @@ public:
     ~LlmAgent();
 
     std::optional<LlmPlan> analyzeUserRequest(const std::string& request);
+    // 테스트 및 외부 사용을 위한 응답 파서(LLM 응답 텍스트 -> LlmPlan)
+    static std::optional<LlmPlan> parseResponseToPlan(const std::string& response);
 
 private:
     std::unique_ptr<class LlmProvider> provider_;
