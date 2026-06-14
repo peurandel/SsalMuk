@@ -1,7 +1,10 @@
 #include <cstdlib>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <vector>
+#include "action_script.h"
 #include "llm_agent.h"
 #include "scrcpy_controller.h"
 #include "screen_analyzer.h"
@@ -58,6 +61,11 @@ int main() {
     ScreenAnalyzer analyzer;
     bool dryRun = getEnvBool("SSALMUK_DRY_RUN");
 
+    const std::vector<std::pair<std::string, std::string>> sampleScripts = {
+        {"gmail", "scripts/gmail_sample.txt"},
+        {"game", "scripts/game_sample.txt"}
+    };
+
     if (dryRun) {
         std::cout << "[DRY-RUN] 명령을 실제로 실행하지 않습니다. 환경 변수 SSALMUK_DRY_RUN=1을 사용 중입니다." << std::endl;
     }
@@ -72,6 +80,68 @@ int main() {
         if (userInput == "quit") {
             break;
         }
+        if (userInput == "list-samples") {
+            std::cout << "사용 가능한 샘플 스크립트:" << std::endl;
+            for (const auto& sample : sampleScripts) {
+                std::cout << "  " << sample.first << " -> " << sample.second << std::endl;
+            }
+            continue;
+        }
+        if (userInput.rfind("run-sample ", 0) == 0 || userInput.rfind("run-script ", 0) == 0) {
+            std::string path;
+            if (userInput.rfind("run-sample ", 0) == 0) {
+                std::string sampleName = userInput.substr(std::string("run-sample ").size());
+                bool found = false;
+                for (const auto& sample : sampleScripts) {
+                    if (sample.first == sampleName) {
+                        path = sample.second;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    std::cerr << "알 수 없는 샘플 이름입니다: " << sampleName << std::endl;
+                    continue;
+                }
+            } else {
+                path = userInput.substr(std::string("run-script ").size());
+            }
+
+            std::ifstream inputFile(path);
+            if (!inputFile) {
+                std::cerr << "스크립트 파일을 열 수 없습니다: " << path << std::endl;
+                continue;
+            }
+
+            std::string scriptSource((std::istreambuf_iterator<char>(inputFile)), std::istreambuf_iterator<char>());
+            ActionScript script;
+            if (!script.parse(scriptSource)) {
+                std::cerr << "스크립트 파싱 실패: " << script.lastError() << std::endl;
+                continue;
+            }
+
+            std::cout << "스크립트 명령 수: " << script.commands().size() << std::endl;
+            for (const auto& command : script.commands()) {
+                std::cout << "  " << command.action;
+                if (command.action == "tap") {
+                    std::cout << " " << command.x.value_or(-1) << " " << command.y.value_or(-1);
+                } else if (command.action == "type") {
+                    std::cout << " " << command.text;
+                } else if (command.action == "wait") {
+                    std::cout << " " << command.waitMs << "ms";
+                }
+                std::cout << std::endl;
+            }
+
+            if (!dryRun) {
+                if (!script.execute(controller, &analyzer, dryRun)) {
+                    std::cerr << "스크립트 실행 실패: " << script.lastError() << std::endl;
+                    continue;
+                }
+            }
+            std::cout << "스크립트 실행을 마쳤습니다." << std::endl;
+            continue;
+        }
 
         auto plan = llm.analyzeUserRequest(userInput);
         if (!plan) {
@@ -80,35 +150,28 @@ int main() {
         }
 
         std::cout << "LLM 계획: " << plan->description << std::endl;
-        for (const auto& step : plan->steps) {
-            std::cout << "실행: " << step.action;
-            if (step.action == "tap") {
-                std::cout << " " << step.x.value_or(-1) << " " << step.y.value_or(-1);
-            } else if (step.action == "type") {
-                std::cout << " " << step.text;
+        ActionScript planScript;
+        if (!planScript.loadFromPlan(*plan)) {
+            std::cerr << "LLM 계획을 스크립트로 변환하지 못했습니다: " << planScript.lastError() << std::endl;
+            continue;
+        }
+
+        for (const auto& command : planScript.commands()) {
+            std::cout << "실행: " << command.action;
+            if (command.action == "tap") {
+                std::cout << " " << command.x.value_or(-1) << " " << command.y.value_or(-1);
+            } else if (command.action == "type") {
+                std::cout << " " << command.text;
+            } else if (command.action == "wait") {
+                std::cout << " " << command.waitMs << "ms";
             }
             std::cout << std::endl;
+        }
 
-            if (dryRun) {
+        if (!dryRun) {
+            if (!planScript.execute(controller, &analyzer, dryRun)) {
+                std::cerr << "LLM 계획 실행 실패: " << planScript.lastError() << std::endl;
                 continue;
-            }
-
-            if (step.action == "tap") {
-                if (step.x && step.y) {
-                    controller.tap(*step.x, *step.y);
-                } else {
-                    std::cerr << "잘못된 tap 명령: x,y 좌표가 필요합니다." << std::endl;
-                }
-            } else if (step.action == "type") {
-                controller.typeText(step.text);
-            } else if (step.action == "capture") {
-                if (auto filePath = controller.captureScreen()) {
-                    analyzer.analyzeScreen(*filePath);
-                } else {
-                    std::cerr << "화면 캡처에 실패했습니다. 사유: " << controller.lastError() << std::endl;
-                }
-            } else {
-                std::cerr << "알 수 없는 명령: " << step.action << std::endl;
             }
         }
 
