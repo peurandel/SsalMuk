@@ -29,6 +29,7 @@ Windows 환경에서 `scrcpy`로 연결된 Android 기기를 C++ 기반 LLM 자�
 - Vulkan UI를 사용하려면 `libglfw3-dev`와 `libvulkan-dev`가 설치되어 있어야 합니다.
 - `SsalMukUI` 바이너리는 Vulkan 기반 창과 기본 렌더링 루프를 제공합니다.
 - `SsalMukInstaller` 바이너리를 빌드하면 설치 프로그램을 실행하여 빌드 결과물을 지정한 디렉터리에 복사할 수 있습니다.
+- `SsalMukLauncher` 바이너리를 빌드하면 `SsalMuk` 실행 파일을 자동으로 찾아 실행하는 네이티브 런처로 사용할 수 있습니다.
 
 ## 설치 프로그램 사용 예
 - Linux: `./build/SsalMukInstaller --source build --dest /opt/SsalMuk`
@@ -58,10 +59,15 @@ Windows에서 한 번 클릭으로 설치하려면 Inno Setup을 사용해 설�
 ## 실행
 
 - **형태**: 이 프로그램은 대화형 CLI입니다. `main.cpp`가 런타임에 사용자 입력을 프롬프트로 받아 처리합니다.
-- **Linux 사용 예**: 스크립트 `run.sh`를 통해 빌드 후 실행합니다.
-	- 실행 전 권한 부여: `chmod +x run.sh`
-	- 빌드 및 실행: `./run.sh`
+- **Linux 사용 예**: `build/SsalMukLauncher`를 통해 실행합니다.
+	- 빌드 후 실행: `./build/SsalMukLauncher`
 - **Windows 사용 예**: `run.bat`을 이용해 빌드 후 실행합니다.
 	- 빌드 및 실행: `run.bat`
+
+- **샘플 스크립트 사용**:
+	- `list-samples` : 사용 가능한 샘플 목록 출력
+	- `run-sample gmail` : Gmail 시나리오 실행
+	- `run-sample game` : 게임 시나리오 실행
+	- `run-script scripts/<파일명>.txt` : 커스텀 액션 스크립트 실행
 
 환경 변수로 `OLLAMA_API_URL`, `OLLAMA_MODEL`, `OLLAMA_API_KEY`를 미리 설정하면 런타임 프롬프트를 건너뛸 수 있습니다.
